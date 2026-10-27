@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Lab OR</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 40 24" width="34" height="20" aria-hidden="true"><path d="M1 13 H10 L13 4 L17 21 L21 9 L23 13 H39" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div><b>Pulse Lab OR</b><span id="caseName">Case rehearsal simulator</span></div>
+  </div>
+  <div class="clock-group">
+    <div class="clock" id="clock" aria-live="off">00:00</div>
+    <div class="speed" role="group" aria-label="Simulation speed">
+      <button data-speed="0" id="pauseBtn" title="Pause (space)">❚❚</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="2">2×</button>
+      <button data-speed="4">4×</button>
+      <button data-speed="8">8×</button>
+    </div>
+    <div class="speed skip" role="group" aria-label="Skip ahead">
+      <button data-skip="60" title="Skip ahead 1 minute">+1 min</button>
+      <button data-skip="300" title="Skip ahead 5 minutes">+5 min</button>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button class="tbtn" id="soundBtn" title="Pulse-oximeter tone and alarms">🔇 Sound off</button>
+    <button class="tbtn" id="newBtn">New case</button>
+    <button class="tbtn primary" id="debriefBtn">End case &amp; debrief</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="left">
+    <div class="monitor" id="monitor">
+      <div class="alarm-bar" id="alarmBar"></div>
+      <div class="wave-row ecg">
+        <div class="wave-label">II<small>ECG</small></div>
+        <div class="cv"><canvas id="wECG"></canvas></div>
+        <div class="tile hr"><span class="tl">HR</span><span class="tv" id="nHR">--</span><span class="tu">bpm</span></div>
+      </div>
+      <div class="wave-row art">
+        <div class="wave-label">ART<small>radial</small></div>
+        <div class="cv"><canvas id="wART"></canvas></div>
+        <div class="tile art"><span class="tl">ART</span><span class="tv sm" id="nART">--/--</span><span class="tu" id="nMAP">(--)</span></div>
+      </div>
+      <div class="wave-row pleth">
+        <div class="wave-label">Pleth<small>SpO₂</small></div>
+        <div class="cv"><canvas id="wPLETH"></canvas></div>
+        <div class="tile spo2"><span class="tl">SpO₂</span><span class="tv" id="nSPO2">--</span><span class="tu">%</span></div>
+      </div>
+      <div class="wave-row co2">
+        <div class="wave-label">CO₂<small>mmHg</small></div>
+        <div class="cv"><canvas id="wCO2"></canvas></div>
+        <div class="tile co2"><span class="tl">EtCO₂</span><span class="tv" id="nETCO2">--</span><span class="tu" id="nRR">RR --</span></div>
+      </div>
+      <div class="numerics">
+        <div class="num nibp"><span class="tl">NIBP <em id="nibpAge">q3 min</em></span><span class="tv" id="nNIBP">--/--</span><span class="tu" id="nNIBPmap">(--)</span><button class="mini" id="nibpBtn" title="Start a cuff measurement now">Cycle</button></div>
+        <div class="num bis"><span class="tl">BIS</span><span class="tv" id="nBIS">--</span><span class="bar"><i id="bisBar"></i></span></div>
+        <div class="num tof"><span class="tl">TOF</span><span class="tv" id="nTOF">-</span><span class="tu" id="nT1">T1 --%</span></div>
+        <div class="num cardiac"><span class="tl">CO / SV</span><span class="tv sm" id="nCO">--</span><span class="tu" id="nSV">SV -- mL</span></div>
+        <div class="num central"><span class="tl">Central BP <em>est.</em></span><span class="tv sm" id="nCBP">--/--</span><span class="tu" id="nAIX">AIx --%</span></div>
+        <div class="num gas"><span class="tl">FiO₂ / PaCO₂</span><span class="tv sm" id="nFIO2">--</span><span class="tu" id="nPACO2">PaCO₂ --</span></div>
+      </div>
+    </div>
+
+    <div class="panel trend-panel">
+      <div class="panel-h">
+        <h2>Trends</h2>
+        <div class="legend">
+          <span class="lg art">MAP</span><span class="lg band">SBP–DBP</span><span class="lg hr">HR</span><span class="lg bis">BIS</span><span class="lg spo2">SpO₂</span>
+          <span class="lg pred" id="predLegend" hidden>forecast</span>
+        </div>
+        <div class="seg" role="group" aria-label="Trend window">
+          <button data-win="900">15 min</button><button data-win="1800" class="on">30 min</button><button data-win="0">Case</button>
+        </div>
+      </div>
+      <div class="trend-wrap"><canvas id="trend"></canvas></div>
+      <div class="forecast" id="forecast" hidden></div>
+    </div>
+    <div class="ops-row">
+    <div class="panel airway">
+      <div class="panel-h"><h2>Airway &amp; ventilation</h2><span class="muted" id="airwayState"></span></div>
+      <div class="btn-grid">
+        <button class="act" data-ev="preox">Preoxygenate<small>mask, FiO₂ 1.0</small></button>
+        <button class="act" data-ev="bag" id="bagBtn">Bag-mask ventilate<small>toggle</small></button>
+        <button class="act strong" data-ev="laryngoscopy">Laryngoscopy &amp; intubate<small>~40 s apnea</small></button>
+        <button class="act" data-ev="extubate">Extubate<small>to face mask</small></button>
+        <button class="act" data-ev="roomair">Remove mask<small>room air</small></button>
+      </div>
+      <div class="vent" id="vent">
+        <div class="vent-h">Ventilator <em id="ventState">standby</em></div>
+        <div class="steppers">
+          <div class="stp" data-k="vt" data-step="25" data-min="250" data-max="800"><span>VT</span><button>−</button><b>500</b><button>+</button><em>mL</em></div>
+          <div class="stp" data-k="rr" data-step="1" data-min="4" data-max="30"><span>RR</span><button>−</button><b>12</b><button>+</button><em>/min</em></div>
+          <div class="stp" data-k="peep" data-step="1" data-min="0" data-max="15"><span>PEEP</span><button>−</button><b>5</b><button>+</button><em>cmH₂O</em></div>
+          <div class="stp" data-k="fio2" data-step="0.1" data-min="0.21" data-max="1"><span>FiO₂</span><button>−</button><b>1.0</b><button>+</button><em></em></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel surgery">
+      <div class="panel-h"><h2>Surgery</h2><span class="muted" id="surgState">not started</span></div>
+      <div class="btn-grid">
+        <button class="act" data-ev="incision">Skin incision</button>
+        <button class="act" data-ev="pneumo_on">Insufflate</button>
+        <button class="act" data-ev="pneumo_off">Desufflate</button>
+        <button class="act" data-ev="surgery_end">End of surgery</button>
+      </div>
+    </div>
+
+  </div>
+    <div class="panel log">
+      <div class="panel-h"><h2>Case log</h2></div>
+      <ol id="logList" class="log-list"></ol>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="panel brief" id="briefPanel"></div>
+
+    <div class="panel state">
+      <div class="panel-h"><h2>Patient</h2><span class="muted" id="ptSummary"></span></div>
+      <div class="chips-row" id="stateChips"></div>
+      <div class="gauges" id="gauges"></div>
+    </div>
+
+    <div class="panel drugs">
+      <div class="panel-h"><h2>Drugs</h2><span class="muted">pick a dose → preview → Give</span></div>
+      <div id="drugList" class="drug-list"></div>
+    </div>
+
+  </aside>
+</main>
+
+<footer class="foot">Pulse Lab OR · created by Dov Greenwald, 2026 · Educational simulation built on published population models (Schnider, Minto, Bouillon, Kern, Wierda/Masui, Li, Su 2023); grade C parts are calibrated assumptions. Not a medical device; it does not predict any individual patient's response.</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- case setup -->
+<div class="modal" id="setup" hidden>
+  <div class="sheet">
+    <h2>Set up a case</h2>
+    <p class="muted">Choose a scenario, then adjust the patient. Every drug and physiology model is listed with its evidence grade.</p>
+    <div class="scen-grid" id="scenGrid"></div>
+    <h3>Patient</h3>
+    <form class="pt-form" id="ptForm"></form>
+    <div class="sheet-actions">
+      <button class="tbtn" id="cancelSetup" type="button">Cancel</button>
+      <button class="tbtn primary" id="startCase" type="button">Start case</button>
+    </div>
+  </div>
+</div>
+
+<!-- debrief -->
+<div class="modal" id="debrief" hidden>
+  <div class="sheet wide">
+    <div class="sheet-top"><h2>Case debrief</h2><div class="sheet-btns"><button class="tbtn" id="resumeCase" title="Close the debrief and continue this case">Resume case</button><button class="tbtn primary" id="closeDebrief">Close case &amp; start new</button></div></div>
+    <div id="debriefBody"></div>
+  </div>
+</div>
+
+<script src="js/pwa-model.js"></script>
+<script src="js/physio.js"></script>
+<script src="js/scenarios.js"></script>
+<script src="js/monitor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
